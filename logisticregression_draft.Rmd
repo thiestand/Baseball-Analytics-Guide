@@ -1,0 +1,124 @@
+---
+title: "Logistic Regression"
+output: html_document
+date: "2024-02-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message = FALSE}
+library(tidyverse)
+library(rvest)
+library(readr)
+```
+
+## Logistic Regression
+
+### Predicting the Odds of > 1 WAR by Overall Draft Pick Number
+
+For this section, we will be using the all_draft dataset.
+
+```{r}
+all_draft <- read.csv("draft_data.csv")
+```
+
+If we want to predict how likely a first round pick number is to have > 1 WAR, we must
+use logistic regression. Similar to linear regression, logistic regression uses
+a response variable to predict another variable. However, the response variables
+with logistic regression are binary, meaning there are only two options. These variables
+tend to look like Yes/No, 1/0 or True/False. 
+
+We must create a variable to determine whether a first round pick accrued more than
+1 WAR in their career. This will give us the binary variable we need to run our
+logistic regression. 
+
+In this example, the variable "positive" is coded as either a "1", for 
+having > 1 WAR, or "0", for not having > 1 WAR. This is the binary variable our
+logistic regression will follow.
+
+**Remember to explain which variables are being created below (positive, position and type) **
+
+```{r}
+all_draft <- mutate(all_draft, 
+                      positive = case_when(is.na(WAR) ~ 0,
+                                           WAR <= 0 ~ 0,
+                                           TRUE ~ 1),
+                      position = ifelse(str_detect(Pos, "HP"), 
+                                        "pitcher", 
+                                        "hitter"),
+                      Type = factor(Type, levels = c("4Yr", "HS", "JC", "")))
+
+```
+
+Now lets run our logistic regression and add the predictions as variables in our
+data.
+
+**Explain that we are using the glm function for logistic regression instead of the lm function used for linear regression**
+
+```{r}
+log_1 <- glm(positive ~ OvPck, 
+             family = binomial, 
+             data = all_draft)
+summary(log_1)
+
+```
+
+The equation for logistic regression is as follows: 
+
+$$\widehat{log\Big(\frac{p}{1-p}\Big)} = b_0 + b_1x$$
+In the equation above the response variable is the log odds of making greater than 1 WAR in the majors
+
+**Move explanations of symbols in the equation here**
+
+**Write out the equation with values from the output**
+
+**Interpret the y intercept and slope for the log odds**
+
+**Sentence about how log odds are difficult to interpret and that we can convert to odds**
+
+$$\widehat{\frac{p}{1-p}} = e^{b_0 + b_1x}$$
+
+**While its not clear from the equation the predicted odds will change by e to the slope for each increase of one in x**
+
+**We are most interested in the probability a player gets greater than 1 WAR**
+
+**Examples of this here**
+
+Because we are looking for the odds that a first round pick obtained > 1 WAR, we 
+need to rearrange the equation. The equation to find the odds will look like:
+
+$$p_i/1-p_i = e^{(B_0 + B_1x_i)}/1 + e^(B_0 + B_1x_i)$$
+
+Now we can interpret each variable:
+
+- $B_0$ = Estimated y-intercept
+- $B_1$ = Estimated slope for the line
+- $p_i/1-p_i$ = The odds of the outcome
+- $x_i$ = The predictor being plugged in
+
+The outcome of this equation will give us the odds that a first round pick will
+generate > 1 WAR by his pick number.
+
+Let's visualize this regression using ggplot(). Because we added the predicted 
+odds as a variable in the data, we can just make that number to the y-axis to
+create our graph. 
+
+```{r}
+all_draft <- all_draft %>%
+  mutate(predict_1_log = predict(log_1, all_draft),
+         predict_1 = exp(predict_1_log) / (1 + exp(predict_1_log)))
+```
+
+```{r}
+ggplot(all_draft, aes(x = OvPck, y = predict_1)) +
+  geom_point() +
+  geom_line() +
+  theme_bw() +
+  lims(y = c(0, 1))
+```
+
+Essentially, our model is saying that as the pick number decreases, the odds that
+the player will generate > 1 WAR will also decrease by 0.04. 
+
